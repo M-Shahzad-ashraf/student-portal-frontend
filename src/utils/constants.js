@@ -1,7 +1,7 @@
 export const CAMPUSES = [
-  { id: "boys", label: "Boys Campus", icon: "👨‍🎓", color: "#185FA5" },
-  { id: "girls", label: "Girls Campus", icon: "👩‍🎓", color: "#993556" },
-  { id: "kids", label: "Kids Campus", icon: "🧒", color: "#854F0B" },
+  { id: "boys", label: "Bader Colony Campus", icon: "👨‍🎓", color: "#185FA5" },
+  { id: "girls", label: "Bilal Colony Campus", icon: "👩‍🎓", color: "#993556" },
+  { id: "kids", label: "Abbas Park Campus", icon: "🧒", color: "#854F0B" },
 ];
 
 export const FEE_MONTHS = [
