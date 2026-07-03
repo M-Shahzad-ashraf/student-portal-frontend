@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { IoCalendarOutline, IoPersonCircleOutline, IoLogOutOutline } from 'react-icons/io5';
+import img from '../../assets/image.png';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -9,7 +10,7 @@ const Header = () => {
     <div className="bg-gradient-to-br from-[#042c53] via-[#0c447c] to-[#185fa5] text-white py-3 px-6 flex flex-col md:flex-row md:items-center gap-4 min-h-[66px] shrink-0">
       <div className="flex items-center gap-3">
         <div className="w-[46px] h-[46px] rounded-full bg-white/15 flex items-center justify-center text-2xl border-2 border-white/35 shrink-0">
-          🕌
+          <img src={img} className="w-full h-full object-contain rounded-full" alt="" />
         </div>
         <div>
           <h1 className="font-amiri text-lg md:text-xl font-bold">

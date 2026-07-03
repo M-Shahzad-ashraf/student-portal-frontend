@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';  // ← Ye sahi hai
 import { IoLogIn, IoPersonAdd } from 'react-icons/io5';
+import img from '../assets/image.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ const Login = () => {
       <div className="bg-white rounded-[18px] w-full max-w-[450px] overflow-hidden shadow-2xl">
         <div className="bg-gradient-to-br from-[#042c53] to-[#185fa5] text-white pt-8 pb-6 px-6 text-center">
           <div className="w-16 h-16 rounded-full bg-white/15 mx-auto mb-3 flex items-center justify-center text-3xl border-2 border-white/35">
-            🕌
+            <img src={img} className="w-full h-full object-contain rounded-full" alt="" />
           </div>
           <h1 className="font-amiri text-xl font-bold">
             Muslim Model High School Pattoki
