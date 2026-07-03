@@ -1,0 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&display=swap");
+
+@import "tailwindcss";
+
+@theme {
+  --font-cairo: "Cairo", sans-serif;
+  --font-amiri: "Amiri", serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-cairo);
+    background-color: #f0f4f9;
+    color: #1a1a1a;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 5mm;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .challan-print-area,
+  .challan-print-area * {
+    visibility: visible !important;
+  }
+  .challan-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
