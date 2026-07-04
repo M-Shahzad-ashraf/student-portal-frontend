@@ -1,6 +1,6 @@
 export const CAMPUSES = [
-  { id: "boys", label: "Bader Colony Campus", icon: "👨‍🎓", color: "#185FA5" },
-  { id: "girls", label: "Bilal Colony Campus", icon: "👩‍🎓", color: "#993556" },
+  { id: "boys", label: "Badar Colony Campus", icon: "👨‍🎓", color: "#185FA5" },
+  { id: "girls", label: "Mega Road Campus", icon: "👩‍🎓", color: "#993556" },
   { id: "kids", label: "Abbas Park Campus", icon: "🧒", color: "#854F0B" },
 ];
 

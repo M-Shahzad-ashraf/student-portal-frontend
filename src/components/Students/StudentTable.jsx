@@ -1,5 +1,4 @@
 // src/components/Students/StudentTable.jsx
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IoEyeOutline, IoPencil, IoTrashOutline } from 'react-icons/io5';
 import { getInitials, getCampusColor, getStatusBadgeClass, getCurrentMonthName, findFeeRecord } from '../../utils/helpers';
@@ -9,6 +8,12 @@ const currentMonthLabel = getCurrentMonthName();
 
 const getCurrentMonthFeeStatus = (student) =>
   findFeeRecord(student?.feeRecords, currentMonthLabel)?.status || 'Unpaid';
+
+const getGenderLabel = (gender) => {
+  if (gender === 'M') return 'Male';
+  if (gender === 'F') return 'Female';
+  return '';
+};
 
 const StudentTable = ({ students = [], onEdit, onDelete }) => {
   const navigate = useNavigate();
@@ -20,7 +25,7 @@ const StudentTable = ({ students = [], onEdit, onDelete }) => {
         <table className="w-full border-collapse text-xs md:text-sm min-w-[900px]">
           <thead className="bg-[#f0f5fb] text-[#4a5568] text-[11px] font-bold uppercase tracking-wider text-left border-b border-[#c5d8ef]">
             <tr>
-              <th className="py-3 px-3.5">#</th>
+              <th className="py-3 px-3.5">Student ID</th>
               <th className="py-3 px-3.5">Student</th>
               <th className="py-3 px-3.5">Campus</th>
               <th className="py-3 px-3.5">Class/Section</th>
@@ -44,7 +49,7 @@ const StudentTable = ({ students = [], onEdit, onDelete }) => {
       <table className="w-full border-collapse text-xs md:text-sm min-w-[900px]">
         <thead className="bg-[#f0f5fb] text-[#4a5568] text-[11px] font-bold uppercase tracking-wider text-left border-b border-[#c5d8ef]">
           <tr>
-            <th className="py-3 px-3.5">#</th>
+            <th className="py-3 px-3.5">Student ID</th>
             <th className="py-3 px-3.5">Student</th>
             <th className="py-3 px-3.5">Campus</th>
             <th className="py-3 px-3.5">Class/Section</th>
@@ -57,10 +62,13 @@ const StudentTable = ({ students = [], onEdit, onDelete }) => {
           {students.map((student, index) => {
             const campus = CAMPUSES.find(c => c.id === student?.campusId);
             const feeStatus = getCurrentMonthFeeStatus(student);
+            const genderLabel = getGenderLabel(student?.gender);
+            const studentId = student?.id || '-';
+            const classSection = [student?.className || student?.classId, student?.section].filter(Boolean).join(' / ') || '-';
 
             return (
               <tr key={student?.id || index} className="hover:bg-[#f8fbff]">
-                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{index + 1}</td>
+                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle font-semibold text-[#185fa5]">{studentId}</td>
                 <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">
                   <div
                     className="flex items-center gap-3 cursor-pointer"
@@ -73,18 +81,18 @@ const StudentTable = ({ students = [], onEdit, onDelete }) => {
                       {getInitials(student?.name)}
                     </div>
                     <div>
-                      <div className="font-semibold text-gray-900">{student?.name || 'N/A'}</div>
-                      <div className="text-[11px] text-[#4a5568]">{student?.gender === 'M' ? 'Male' : 'Female'} · {student?.id}</div>
+                      <div className="font-semibold text-gray-900">{student?.name || '-'}</div>
+                      <div className="text-[11px] text-[#4a5568]">{genderLabel || '-'}</div>
                     </div>
                   </div>
                 </td>
                 <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">
                   <span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-[#e6f1fb] text-[#185fa5]">
-                    {campus?.label || student?.campusId || 'N/A'}
+                    {campus?.label || student?.campusId || '-'}
                   </span>
                 </td>
-                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{student?.className || student?.classId} / {student?.section}</td>
-                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{student?.fatherName || 'N/A'}</td>
+                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{classSection}</td>
+                <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{student?.fatherName || '-'}</td>
                 <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">
                   <span className={`inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${getStatusBadgeClass(feeStatus)}`}>
                     {feeStatus}

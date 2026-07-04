@@ -43,6 +43,7 @@ const StudentProfile = () => {
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [feeData, setFeeData] = useState(null);
+  const [payingMonth, setPayingMonth] = useState(null);
 
   const academicStartYear = getAcademicYearStart();
   const academicYearLabel = getAcademicYearLabel(academicStartYear);
@@ -88,22 +89,56 @@ const StudentProfile = () => {
     }
   };
 
+  const openChallanPdf = async (month, year, targetWindow) => {
+    // Use the PDF endpoint directly because it needs the auth header.
+    const token = localStorage.getItem('token');
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const pdfUrl = `${apiBase}/fees/student/${id}/challan/${month}/${year}/pdf`;
+    const res = await fetch(pdfUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('PDF generation failed');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
   const handlePrintChallan = async (month) => {
     try {
       const year = getFeeYearForMonth(month, academicStartYear);
-      // Use the PDF endpoint directly — fetch as blob with auth header
-      const token = localStorage.getItem('token');
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const pdfUrl = `${apiBase}/fees/student/${id}/challan/${month}/${year}/pdf`;
-      const res = await fetch(pdfUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('PDF generation failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      await openChallanPdf(month, year);
     } catch (error) {
       toast.error('Failed to generate challan');
+    }
+  };
+
+  const handlePayFee = async (month, record) => {
+    const year = getFeeYearForMonth(month, academicStartYear);
+    const amount = record?.amount || student.monthlyFee || 0;
+    const receipt = record?.receipt || `RCP${Date.now()}`;
+    const paidWindow = window.open('', '_blank');
+
+    setPayingMonth(month);
+    try {
+      await feesAPI.updateFee(id, month, year, {
+        status: 'Paid',
+        amount,
+        paidAmount: amount,
+        paidDate: getLocalDateString(),
+        receipt,
+      });
+      toast.success('Fee paid successfully');
+      await fetchStudent();
+      await openChallanPdf(month, year, paidWindow);
+    } catch (error) {
+      if (paidWindow && !paidWindow.closed) paidWindow.close();
+      toast.error(error.response?.data?.message || 'Failed to pay fee');
+    } finally {
+      setPayingMonth(null);
     }
   };
 
@@ -263,10 +298,11 @@ const StudentProfile = () => {
               {(currentRecord.status === 'Unpaid' || currentRecord.status === 'Partial') && (
                 <button
                   type="button"
-                  onClick={() => handlePrintChallan(currentMonth)}
-                  className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1"
+                  onClick={() => handlePayFee(currentMonth, currentRecord)}
+                  disabled={payingMonth === currentMonth}
+                  className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <IoCashOutline size={14} /> Pay Fee
+                  <IoCashOutline size={14} /> {payingMonth === currentMonth ? 'Paying...' : 'Pay Fee'}
                 </button>
               )}
             </div>
@@ -352,10 +388,11 @@ const StudentProfile = () => {
                     {(record.status === 'Unpaid' || record.status === 'Partial') && (
                       <button
                         type="button"
-                        onClick={() => handlePrintChallan(month)}
-                        className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1"
+                        onClick={() => handlePayFee(month, record)}
+                        disabled={payingMonth === month}
+                        className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        <IoCashOutline size={14} /> Pay Fee
+                        <IoCashOutline size={14} /> {payingMonth === month ? 'Paying...' : 'Pay Fee'}
                       </button>
                     )}
                     <button

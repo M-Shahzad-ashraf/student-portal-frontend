@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { studentsAPI } from '../../api/students';
 import { classesAPI } from '../../api/classes';
 import { CAMPUSES, BLOOD_GROUPS } from '../../utils/constants';
-import { getLocalDateString } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
@@ -21,7 +20,7 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
     className: student?.className || '',
     section: student?.section || '',
     gender: student?.gender || 'M',
-    dob: student?.dob || '',
+    dob: student?.dob ? student.dob.split('T')[0] : '',
     bloodGroup: student?.bloodGroup || 'A+',
     monthlyFee: student?.monthlyFee || 2000,
     bForm: student?.bForm || '',
@@ -34,6 +33,8 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
   useEffect(() => {
     if (formData.campusId) {
       loadClasses();
+    } else {
+      setClassesList([]);
     }
   }, [formData.campusId]);
 
@@ -41,6 +42,8 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
   useEffect(() => {
     if (formData.classId) {
       loadSections();
+    } else {
+      setSections([]);
     }
   }, [formData.classId]);
 
@@ -66,12 +69,21 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'classId') {
+    if (name === 'campusId') {
+      setFormData({
+        ...formData,
+        campusId: value,
+        classId: '',
+        className: '',
+        section: ''
+      });
+    } else if (name === 'classId') {
       const selectedClass = classesList.find(c => c.id === value);
       setFormData({
         ...formData,
         classId: value,
-        className: selectedClass ? selectedClass.name : ''
+        className: selectedClass ? selectedClass.name : '',
+        section: ''
       });
     } else {
       setFormData({ ...formData, [name]: value });
@@ -82,7 +94,7 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.name || !formData.fatherName || !formData.classId || !formData.section || (!isEditing && !formData.id)) {
+    if (!formData.name || !formData.fatherName || !formData.classId || !formData.section) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -99,7 +111,7 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
         response = await studentsAPI.create(formData);
         toast.success('Student added successfully');
         // Pass the newly created student back to the parent
-        onSuccess(response?.data);
+        onSuccess(response?.data?.data || response?.data);
       }
     } catch (error) {
       console.error('Save error:', error);
@@ -109,18 +121,30 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
     }
   };
 
+  const getAvailableSections = () => {
+    let list = [...sections];
+    if (list.length === 0) {
+      list = ['A'];
+    }
+    if (formData.section && !list.includes(formData.section)) {
+      list.push(formData.section);
+    }
+    return list;
+  };
+  const availableSections = getAvailableSections();
+
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
       <div className="flex flex-col gap-1.5 md:col-span-2">
-        <label className="text-[10px] font-bold text-[#4a5568] uppercase">Student ID *</label>
+        <label className="text-[10px] font-bold text-[#4a5568] uppercase">Student ID {isEditing ? '*' : '(Auto)'}</label>
         <input 
           type="text" 
           name="id" 
           value={formData.id} 
           onChange={handleChange} 
-          required 
+          required={isEditing}
           disabled={isEditing}
-          placeholder="e.g. S1005" 
+          placeholder="Leave blank for auto ID" 
           className="py-2 px-3 border border-[#c5d8ef] rounded-lg text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" 
         />
       </div>
@@ -159,7 +183,7 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
         <label className="text-[10px] font-bold text-[#4a5568] uppercase">Section *</label>
         <select name="section" value={formData.section} onChange={handleChange} required className="py-2 px-3 border border-[#c5d8ef] rounded-lg text-sm">
           <option value="">Select Section</option>
-          {sections.map(s => <option key={s} value={s}>{s}</option>)}
+          {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       
