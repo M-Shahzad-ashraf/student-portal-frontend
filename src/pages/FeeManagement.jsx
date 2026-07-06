@@ -1,57 +1,107 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { feesAPI } from '../api/fees';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import { formatCurrency } from '../utils/helpers';
-import { CAMPUSES } from '../utils/constants';
+import { CAMPUSES, FEE_MONTHS } from '../utils/constants';
 import toast from 'react-hot-toast';
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December'
+const CALENDAR_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const getCurrentMonth = () => MONTHS[new Date().getMonth()];
-const getCurrentYear  = () => new Date().getFullYear();
+const getCurrentMonth = () => CALENDAR_MONTHS[new Date().getMonth()];
+const getCurrentYear = () => new Date().getFullYear();
+
+const getAcademicStartYear = (month, year) =>
+  month === 'January' || month === 'February' ? year - 1 : year;
+
+const getFeeYearForMonth = (month, academicStartYear) =>
+  month === 'January' || month === 'February' ? academicStartYear + 1 : academicStartYear;
+
+const getMonthsToSelected = (month) => {
+  const selectedIndex = FEE_MONTHS.indexOf(month);
+  return selectedIndex === -1 ? [month] : FEE_MONTHS.slice(0, selectedIndex + 1);
+};
+
+const getCampusLabel = (campusId) =>
+  CAMPUSES.find(campus => campus.id === campusId)?.label || campusId || '-';
 
 const FeeManagement = () => {
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState(null);
   const [defaulters, setDefaulters] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
-
-  // Dynamic month/year — default to current
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
-  const [selectedYear, setSelectedYear]   = useState(getCurrentYear());
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [campusFilter, setCampusFilter] = useState('all');
+  const [minDueMonths, setMinDueMonths] = useState(1);
 
-  // Year options: last 2 years up to next year
   const yearOptions = [getCurrentYear() - 1, getCurrentYear(), getCurrentYear() + 1];
+  const academicStartYear = getAcademicStartYear(selectedMonth, selectedYear);
+  const selectedMonths = getMonthsToSelected(selectedMonth);
+  const visibleDefaulters = defaulters.filter(def => def.dueMonthCount >= minDueMonths);
 
   useEffect(() => {
     fetchData();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, campusFilter]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const overviewRes = await feesAPI.getOverview({ month: selectedMonth, year: selectedYear });
+      const params = campusFilter !== 'all' ? { campusId: campusFilter } : {};
+      const overviewRes = await feesAPI.getOverview({
+        month: selectedMonth,
+        year: selectedYear,
+        ...params,
+      });
       setOverview(overviewRes.data?.data || overviewRes.data);
 
-      const reportRes = await feesAPI.getMonthlyReport(selectedMonth, selectedYear);
-      // Build defaulters list from report
-      const reportData = reportRes.data?.data || [];
-      const defs = reportData
-        .filter(r => r.feeStatus === 'Unpaid' || r.feeStatus === 'Partial')
-        .map(r => ({
-          id: r.studentId,
-          name: r.studentName,
-          campus: r.campusId,
-          className: r.classId,
-          section: r.section,
-          fatherPhone: r.fatherPhone,
-          unpaidMonths: r.feeStatus,
-          outstanding: r.monthlyFee - (r.paidAmount || 0),
-        }));
-      setDefaulters(defs);
+      const monthlyReports = await Promise.all(
+        selectedMonths.map(async (month) => {
+          const year = getFeeYearForMonth(month, academicStartYear);
+          const reportRes = await feesAPI.getMonthlyReport(month, year, params);
+          return {
+            month,
+            year,
+            rows: reportRes.data?.data || [],
+          };
+        }),
+      );
+
+      const defaulterMap = new Map();
+      monthlyReports.forEach(({ month, rows }) => {
+        rows.forEach((row) => {
+          if (row.feeStatus !== 'Unpaid' && row.feeStatus !== 'Partial') return;
+
+          const amount = row.amount || row.monthlyFee || 0;
+          const paidAmount = row.paidAmount || 0;
+          const outstanding = Math.max(0, amount - paidAmount);
+          if (outstanding <= 0) return;
+
+          const existing = defaulterMap.get(row.studentId) || {
+            id: row.studentId,
+            name: row.studentName,
+            campusId: row.campusId,
+            campus: getCampusLabel(row.campusId),
+            className: row.className || row.classId,
+            section: row.section,
+            fatherPhone: row.fatherPhone,
+            dueMonths: [],
+            outstanding: 0,
+          };
+
+          existing.dueMonths.push(`${month} (${row.feeStatus})`);
+          existing.outstanding += outstanding;
+          defaulterMap.set(row.studentId, existing);
+        });
+      });
+
+      setDefaulters(
+        Array.from(defaulterMap.values())
+          .map(def => ({ ...def, dueMonthCount: def.dueMonths.length }))
+          .sort((a, b) => b.dueMonthCount - a.dueMonthCount || b.outstanding - a.outstanding),
+      );
     } catch (error) {
       console.error('API Error:', error);
       toast.error(error.response?.data?.message || 'Failed to load fee data');
@@ -60,41 +110,110 @@ const FeeManagement = () => {
     }
   };
 
+  const handlePrintDefaulters = () => {
+    const title = `Outstanding Defaulters - ${selectedMonth} ${selectedYear}`;
+    const campusText = campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter);
+    const rows = visibleDefaulters.map((def, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${def.id}</td>
+        <td>${def.name || ''}</td>
+        <td>${def.campus}</td>
+        <td>${def.className || ''} ${def.section ? `(${def.section})` : ''}</td>
+        <td>${def.fatherPhone || ''}</td>
+        <td>${def.dueMonths.join(', ')}</td>
+        <td>${def.outstanding.toLocaleString('en-PK')}</td>
+      </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Please allow popups to print');
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { font-size: 12px; color: #4b5563; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #d1d5db; padding: 6px; text-align: left; vertical-align: top; }
+            th { background: #e6f1fb; }
+            td:last-child, th:last-child { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <div class="meta">${campusText} | ${minDueMonths}+ due month(s) | Total students: ${visibleDefaulters.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Campus</th>
+                <th>Class</th>
+                <th>Father Contact</th>
+                <th>Due Months</th>
+                <th>Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="8">No defaulters found</td></tr>'}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   if (loading) return <LoadingSpinner />;
 
-  // Support both API response shapes
   const ovData = overview?.data || overview;
 
   return (
     <div>
-      {/* Header with month/year selector */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="text-lg md:text-xl font-bold text-gray-900">
-          Fee Overview — {selectedMonth} {selectedYear}
+          Fee Overview - {selectedMonth} {selectedYear}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={campusFilter}
+            onChange={e => setCampusFilter(e.target.value)}
+            className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer"
+          >
+            <option value="all">All Campuses</option>
+            {CAMPUSES.map(campus => (
+              <option key={campus.id} value={campus.id}>{campus.label}</option>
+            ))}
+          </select>
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
             className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer"
           >
-            {MONTHS.map(m => (
-              <option key={m} value={m}>{m}</option>
+            {CALENDAR_MONTHS.map(month => (
+              <option key={month} value={month}>{month}</option>
             ))}
           </select>
           <select
             value={selectedYear}
-            onChange={e => setSelectedYear(parseInt(e.target.value))}
+            onChange={e => setSelectedYear(parseInt(e.target.value, 10))}
             className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer"
           >
-            {yearOptions.map(y => (
-              <option key={y} value={y}>{y}</option>
+            {yearOptions.map(year => (
+              <option key={year} value={year}>{year}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <div className="bg-white rounded-lg border border-[#c5d8ef] p-3.5 flex items-center gap-3 shadow-sm">
           <div className="w-10 h-10 rounded-[9px] flex items-center justify-center text-lg shrink-0 bg-[#e1f5ee] text-[#0f6e56]"><i className="ti ti-check-circle"></i></div>
@@ -114,8 +233,7 @@ const FeeManagement = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <button onClick={() => setActiveTab('overview')} className={`py-1.5 px-4 rounded-lg text-xs md:text-sm font-semibold cursor-pointer ${activeTab === 'overview' ? 'bg-[#185fa5] text-white' : 'bg-white text-[#185fa5] border border-[#185fa5]'}`}>
           Monthly Campus Grid
         </button>
@@ -124,69 +242,68 @@ const FeeManagement = () => {
         </button>
       </div>
 
-      {/* Overview Tab */}
-      {activeTab === 'overview' && ovData?.campusData && (
-        <div>
-          {CAMPUSES.map(campus => {
-            const data = ovData.campusData[campus.id];
-            if (!data) return null;
-            return (
-              <div key={campus.id} className="bg-white rounded-[10px] border border-[#c5d8ef] overflow-hidden mb-4 shadow-sm">
-                <div className="p-3.5 flex items-center gap-2 border-b border-[#c5d8ef] flex-wrap">
-                  <span className="font-bold text-sm md:text-base text-gray-900">{campus.icon} {campus.label}</span>
-                  <span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-[#e6f1fb] text-[#185fa5]">{data.totalStudents} students</span>
-                  <span className="ml-auto text-xs md:text-sm text-[#4a5568]">{formatCurrency(data.collected)} collected</span>
-                </div>
-                <div className="w-full overflow-x-auto">
-                  <table className="w-full border-collapse text-xs md:text-sm min-w-[600px]">
-                    <thead className="bg-[#f0f5fb] text-[#4a5568] text-[11px] font-bold uppercase tracking-wider text-left border-b border-[#c5d8ef]">
-                      <tr><th className="py-3 px-3.5">Class</th><th className="py-3 px-3.5">Students</th><th className="py-3 px-3.5">Paid</th><th className="py-3 px-3.5">Unpaid</th><th className="py-3 px-3.5">Partial</th><th className="py-3 px-3.5">Collection</th></tr>
-                    </thead>
-                    <tbody>
-                      {data.classes?.map(cls => (
-                        <tr key={cls.id} className="hover:bg-[#f8fbff]">
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle font-semibold">{cls.name}</td>
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{cls.totalStudents}</td>
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle"><span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold bg-[#e1f5ee] text-[#0f6e56]">{cls.paid}</span></td>
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle"><span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold bg-[#fcebeb] text-[#a32d2d]">{cls.unpaid}</span></td>
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle"><span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold bg-[#faeeda] text-[#ba7517]">{cls.partial}</span></td>
-                          <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{formatCurrency(cls.collection)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
+      {activeTab === 'overview' && (
+        <div className="bg-white rounded-[10px] border border-[#c5d8ef] p-4 shadow-sm">
+          <div className="text-sm font-semibold text-gray-800">
+            {campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter)} summary for {selectedMonth} {selectedYear}
+          </div>
+          <div className="text-xs text-[#4a5568] mt-1">
+            Expected: {formatCurrency(ovData?.expectedTotal || 0)} | Collection Rate: {ovData?.collectionRate || 0}%
+          </div>
         </div>
       )}
 
-      {/* Defaulters Tab */}
       {activeTab === 'defaulters' && (
         <div className="bg-white rounded-[10px] border border-[#c5d8ef] overflow-hidden shadow-sm">
-          <div className="p-4 bg-[#fcf9f2] border-b border-[#c5d8ef]">
-            <span className="font-bold text-gray-800"><i className="ti ti-alert-triangle text-[#ba7517] mr-1"></i> Outstanding Defaulter Register — {selectedMonth} {selectedYear}</span>
+          <div className="p-4 bg-[#fcf9f2] border-b border-[#c5d8ef] flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <span className="font-bold text-gray-800"><i className="ti ti-alert-triangle text-[#ba7517] mr-1"></i> Outstanding Defaulter Register - March to {selectedMonth} {selectedYear}</span>
+              <div className="text-xs text-[#4a5568] mt-1">{campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter)}</div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={minDueMonths}
+                onChange={e => setMinDueMonths(parseInt(e.target.value, 10))}
+                className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-white focus:border-[#185fa5] outline-none cursor-pointer"
+              >
+                <option value={1}>1+ due month</option>
+                <option value={2}>2+ due months</option>
+                <option value={3}>3+ due months</option>
+              </select>
+              <button
+                type="button"
+                onClick={handlePrintDefaulters}
+                className="py-1.5 px-3 rounded-lg text-xs md:text-sm font-semibold bg-[#185fa5] text-white hover:bg-[#378add] inline-flex items-center gap-1"
+              >
+                <i className="ti ti-printer"></i> Print
+              </button>
+            </div>
           </div>
           <div className="w-full overflow-x-auto">
-            <table className="w-full border-collapse text-xs md:text-sm min-w-[700px]">
+            <table className="w-full border-collapse text-xs md:text-sm min-w-[850px]">
               <thead className="bg-[#f0f5fb] text-[#4a5568] text-[11px] font-bold uppercase tracking-wider text-left border-b border-[#c5d8ef]">
-                <tr><th className="py-3 px-3.5">ID / Name</th><th className="py-3 px-3.5">Campus / Class</th><th className="py-3 px-3.5">Father Contact</th><th className="py-3 px-3.5">Status</th><th className="py-3 px-3.5 text-right">Outstanding</th><th className="py-3 px-3.5 text-center">Action</th></tr>
+                <tr>
+                  <th className="py-3 px-3.5">ID / Name</th>
+                  <th className="py-3 px-3.5">Campus / Class</th>
+                  <th className="py-3 px-3.5">Father Contact</th>
+                  <th className="py-3 px-3.5">Due Months</th>
+                  <th className="py-3 px-3.5 text-right">Outstanding</th>
+                </tr>
               </thead>
               <tbody>
-                {defaulters.length === 0 ? (
-                  <tr><td colSpan="6" className="text-center py-6 text-gray-500">No defaulters found for {selectedMonth} {selectedYear}</td></tr>
+                {visibleDefaulters.length === 0 ? (
+                  <tr><td colSpan="5" className="text-center py-6 text-gray-500">No defaulters found for this filter</td></tr>
                 ) : (
-                  defaulters.map(def => (
+                  visibleDefaulters.map(def => (
                     <tr key={def.id} className="hover:bg-red-50/40">
                       <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle"><div className="font-bold text-gray-900">{def.name}</div><div className="text-[10px] text-[#4a5568]">{def.id}</div></td>
                       <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle"><div>{def.campus}</div><div className="text-xs text-gray-500">{def.className} ({def.section})</div></td>
-                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{def.fatherPhone || '—'}</td>
-                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle text-[#ba7517] font-semibold">{def.unpaidMonths}</td>
-                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle text-right font-bold text-red-600">{formatCurrency(def.outstanding)}</td>
-                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle text-center">
-                        <button className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] text-white">Quick Pay</button>
+                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle">{def.fatherPhone || '-'}</td>
+                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle text-[#ba7517] font-semibold">
+                        <div>{def.dueMonthCount} month(s)</div>
+                        <div className="text-[11px] text-[#4a5568] font-normal">{def.dueMonths.join(', ')}</div>
                       </td>
+                      <td className="py-3 px-3.5 border-b border-[#eef3f9] align-middle text-right font-bold text-red-600">{formatCurrency(def.outstanding)}</td>
                     </tr>
                   ))
                 )}
