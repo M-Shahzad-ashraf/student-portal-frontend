@@ -20,9 +20,8 @@ export const studentsAPI = {
   import: (file) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post("/students/import", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    // Let axios set Content-Type with boundary — manual header breaks upload
+    return api.post("/students/import", formData);
   },
 
   // GET /api/students/export with flexible params

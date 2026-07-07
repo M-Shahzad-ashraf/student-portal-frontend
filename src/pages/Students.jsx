@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { studentsAPI } from '../api/students';
 import SearchBar from '../components/Common/SearchBar';
@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/Common/LoadingSpinner';
 import StudentTable from '../components/Students/StudentTable';
 import StudentForm from '../components/Students/StudentForm';
 import { PAGE_SIZE, CAMPUSES } from '../utils/constants';
-import { exportToExcel, exportToCSV, downloadTemplate } from '../utils/exportUtils';
+import { downloadTemplate } from '../utils/exportUtils';
 import toast from 'react-hot-toast';
 
 const Students = () => {
@@ -24,6 +24,7 @@ const Students = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Get filters from URL params - support both naming conventions
   const campusFilter = searchParams.get('campusId') || searchParams.get('campus');
@@ -98,15 +99,51 @@ const Students = () => {
   };
 
   const handleImport = async (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
     if (!file) return;
 
     try {
-      await studentsAPI.import(file);
-      toast.success('Students imported successfully');
-      fetchStudents();
+      const response = await studentsAPI.import(file);
+      const { success, message, data } = response.data;
+
+      if (success) {
+        const created = data?.created || 0;
+        const skipped = data?.skipped || 0;
+        const errors = data?.errors || [];
+
+        if (created > 0) {
+          if (skipped > 0) {
+            toast.success(`Imported ${created} students. ${skipped} rows skipped.`);
+            console.warn('Import errors:', errors);
+          } else {
+            toast.success(`Successfully imported ${created} students.`);
+          }
+          fetchStudents();
+        } else {
+          toast.error('Import failed: All rows were skipped.');
+          if (errors.length > 0) {
+            alert(`Import details:\n${errors.slice(0, 20).join('\n')}${errors.length > 20 ? `\n...and ${errors.length - 20} more` : ''}`);
+          }
+        }
+      } else {
+        toast.error(message || 'Import failed');
+      }
     } catch (error) {
-      toast.error('Import failed');
+      toast.error(error.response?.data?.message || 'Import failed');
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      downloadTemplate();
+      toast.success('Template downloaded');
+    } catch (error) {
+      console.error('Template download failed:', error);
+      toast.error('Template download failed');
     }
   };
 
@@ -187,9 +224,15 @@ const Students = () => {
             </button>
             <label className="py-1 px-2.5 rounded-lg text-xs font-semibold border border-[#185fa5] bg-white text-[#185fa5] hover:bg-[#e6f1fb] inline-flex items-center gap-1 cursor-pointer">
               <i className="ti ti-file-upload"></i> Import
-              <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleImport} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={handleImport}
+              />
             </label>
-            <button onClick={downloadTemplate} className="py-1 px-2.5 rounded-lg text-xs font-semibold border border-[#185fa5] bg-white text-[#185fa5] hover:bg-[#e6f1fb] inline-flex items-center gap-1">
+            <button onClick={handleDownloadTemplate} className="py-1 px-2.5 rounded-lg text-xs font-semibold border border-[#185fa5] bg-white text-[#185fa5] hover:bg-[#e6f1fb] inline-flex items-center gap-1">
               <i className="ti ti-download"></i> Template
             </button>
           </div>
