@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { studentsAPI } from '../../api/students';
 import { classesAPI } from '../../api/classes';
-import { CAMPUSES, BLOOD_GROUPS } from '../../utils/constants';
+import { CAMPUSES, BLOOD_GROUPS, FEE_MONTHS } from '../../utils/constants';
+import { getDefaultFeeStartMonth, resolveStudentFeeStartMonth } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
@@ -23,6 +24,7 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
     dob: student?.dob ? student.dob.split('T')[0] : '',
     bloodGroup: student?.bloodGroup || 'A+',
     monthlyFee: student?.monthlyFee || 2000,
+    feeStartMonth: student ? resolveStudentFeeStartMonth(student) : getDefaultFeeStartMonth(),
     bForm: student?.bForm || '',
     email: student?.email || '',
     address: student?.address || '',
@@ -210,6 +212,24 @@ const StudentForm = ({ student, defaultCampus, onSuccess, onCancel }) => {
       <div className="flex flex-col gap-1.5">
         <label className="text-[10px] font-bold text-[#4a5568] uppercase">Monthly Fee (Rs)</label>
         <input type="number" name="monthlyFee" value={formData.monthlyFee} onChange={handleChange} className="py-2 px-3 border border-[#c5d8ef] rounded-lg text-sm" />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[10px] font-bold text-[#4a5568] uppercase">Fee Start Month *</label>
+        <select
+          name="feeStartMonth"
+          value={formData.feeStartMonth}
+          onChange={handleChange}
+          required
+          className="py-2 px-3 border border-[#c5d8ef] rounded-lg text-sm"
+        >
+          {FEE_MONTHS.map((month) => (
+            <option key={month} value={month}>{month}</option>
+          ))}
+        </select>
+        <p className="text-[10px] text-[#4a5568]">
+          Fee will be charged from this month onward. Cannot be before the academic session start (March).
+        </p>
       </div>
       
       <div className="flex flex-col gap-1.5">

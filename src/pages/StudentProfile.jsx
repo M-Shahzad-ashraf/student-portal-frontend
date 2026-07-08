@@ -30,6 +30,8 @@ import {
   findFeeRecord,
   buildMonthlyRecordsMap,
   getDefaultFeeRecord,
+  resolveStudentFeeStartMonth,
+  isMonthBeforeFeeStart,
 } from '../utils/helpers';
 import { FEE_MONTHS, CAMPUSES } from '../utils/constants';
 import toast from 'react-hot-toast';
@@ -156,6 +158,7 @@ const StudentProfile = () => {
 
   const totalPaid = feeData?.totalPaid ?? 0;
   const outstanding = feeData?.outstanding ?? 0;
+  const feeStartMonth = feeData?.feeStartMonth || resolveStudentFeeStartMonth(student);
 
   const tabs = [
     { id: 'info', label: 'Personal Info', icon: IoPersonOutline },
@@ -245,6 +248,7 @@ const StudentProfile = () => {
               ['Class', student.className || student.classId],
               ['Section', student.section],
               ['Monthly Fee', formatCurrency(student.monthlyFee || 0)],
+              ['Fee Start Month', feeStartMonth],
               ['Admission', formatDisplayDate(student.admissionDate)],
               ['Address', student.address || '—'],
             ].map(([label, value]) => (
@@ -343,6 +347,7 @@ const StudentProfile = () => {
               <IoWalletOutline className="text-[#185fa5]" /> Monthly Tuition Records {academicYearLabel}
             </div>
             {FEE_MONTHS.map((month) => {
+              const beforeFeeStart = isMonthBeforeFeeStart(student, month);
               const record =
                 monthlyRecords[month] ||
                 findFeeRecord(student.feeRecords, month, academicStartYear) ||
@@ -354,55 +359,66 @@ const StudentProfile = () => {
                 <div
                   key={month}
                   className={`flex items-center gap-3 py-3 px-4 border-b border-[#eef3f9] last:border-none flex-wrap ${
-                    isCurrentMonth ? 'bg-[#f8fbff] ring-1 ring-inset ring-[#185fa5]/20' : ''
-                  }`}
+                    isCurrentMonth && !beforeFeeStart ? 'bg-[#f8fbff] ring-1 ring-inset ring-[#185fa5]/20' : ''
+                  } ${beforeFeeStart ? 'opacity-60 bg-gray-50' : ''}`}
                 >
                   <div className="min-w-[120px]">
                     <div className="font-semibold text-xs md:text-sm text-gray-900">
                       {month} {feeYear}
-                      {isCurrentMonth && (
+                      {isCurrentMonth && !beforeFeeStart && (
                         <span className="ml-1.5 text-[10px] font-bold text-[#185fa5] uppercase">Current</span>
                       )}
                     </div>
                   </div>
-                  <div className="text-xs md:text-sm text-[#4a5568]">{formatCurrency(record.amount || student.monthlyFee)}</div>
-                  {record.status === 'Partial' && (
-                    <div className="text-[11px] text-[#ba7517] font-semibold">
-                      Paid: {formatCurrency(record.paidAmount || 0)}
-                    </div>
+                  {beforeFeeStart ? (
+                    <>
+                      <div className="text-xs md:text-sm text-[#4a5568]">—</div>
+                      <span className="inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap bg-gray-100 text-gray-500">
+                        N/A
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xs md:text-sm text-[#4a5568]">{formatCurrency(record.amount || student.monthlyFee)}</div>
+                      {record.status === 'Partial' && (
+                        <div className="text-[11px] text-[#ba7517] font-semibold">
+                          Paid: {formatCurrency(record.paidAmount || 0)}
+                        </div>
+                      )}
+                      <span className={`inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${getStatusBadgeClass(record.status)}`}>
+                        {record.status || 'Unpaid'}
+                      </span>
+                      <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMonth(month);
+                            setShowFeeModal(true);
+                          }}
+                          className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#faeeda] text-[#ba7517] hover:bg-[#f3dfbe] inline-flex items-center gap-1"
+                        >
+                          <IoPencil size={14} /> Update
+                        </button>
+                        {(record.status === 'Unpaid' || record.status === 'Partial') && (
+                          <button
+                            type="button"
+                            onClick={() => handlePayFee(month, record)}
+                            disabled={payingMonth === month}
+                            className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <IoCashOutline size={14} /> {payingMonth === month ? 'Paying...' : 'Pay Fee'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handlePrintChallan(month)}
+                          className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#e1f5ee] text-[#0f6e56] hover:bg-emerald-100 inline-flex items-center gap-1"
+                        >
+                          <IoPrintOutline size={14} /> Challan
+                        </button>
+                      </div>
+                    </>
                   )}
-                  <span className={`inline-block py-1 px-2.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${getStatusBadgeClass(record.status)}`}>
-                    {record.status || 'Unpaid'}
-                  </span>
-                  <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedMonth(month);
-                        setShowFeeModal(true);
-                      }}
-                      className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#faeeda] text-[#ba7517] hover:bg-[#f3dfbe] inline-flex items-center gap-1"
-                    >
-                      <IoPencil size={14} /> Update
-                    </button>
-                    {(record.status === 'Unpaid' || record.status === 'Partial') && (
-                      <button
-                        type="button"
-                        onClick={() => handlePayFee(month, record)}
-                        disabled={payingMonth === month}
-                        className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#0f6e56] hover:bg-emerald-800 text-white inline-flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        <IoCashOutline size={14} /> {payingMonth === month ? 'Paying...' : 'Pay Fee'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handlePrintChallan(month)}
-                      className="py-1 px-2.5 rounded-lg text-xs font-semibold bg-[#e1f5ee] text-[#0f6e56] hover:bg-emerald-100 inline-flex items-center gap-1"
-                    >
-                      <IoPrintOutline size={14} /> Challan
-                    </button>
-                  </div>
                 </div>
               );
             })}

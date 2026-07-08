@@ -97,6 +97,29 @@ export const getDefaultFeeRecord = (monthlyFee = 2000) => ({
   paidAmount: 0,
 });
 
+export const getDefaultFeeStartMonth = () =>
+  CALENDAR_MONTHS[new Date().getMonth()];
+
+export const resolveStudentFeeStartMonth = (student) => {
+  if (student?.feeStartMonth) return student.feeStartMonth;
+  if (student?.admissionDate) {
+    return CALENDAR_MONTHS[new Date(student.admissionDate).getMonth()];
+  }
+  return FEE_MONTHS[0];
+};
+
+export const getStudentFeeStartIndex = (student) => {
+  const feeStartMonth = resolveStudentFeeStartMonth(student);
+  const index = FEE_MONTHS.indexOf(feeStartMonth);
+  return index === -1 ? 0 : index;
+};
+
+export const isMonthBeforeFeeStart = (student, month) => {
+  const monthIndex = FEE_MONTHS.indexOf(month);
+  if (monthIndex === -1) return false;
+  return monthIndex < getStudentFeeStartIndex(student);
+};
+
 export const formatDisplayDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
