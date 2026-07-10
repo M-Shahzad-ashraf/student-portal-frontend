@@ -56,7 +56,9 @@ const Classes = () => {
           <span className="text-5xl">{campus?.icon}</span>
           <div>
             <h1 className="text-2xl font-bold font-amiri">{campus?.label}</h1>
-            <p className="text-sm opacity-80 mt-1">{classes.length} Classes</p>
+            <p className="text-sm opacity-80 mt-1">
+              {classes.length} Classes | {classes.reduce((sum, cls) => sum + (cls.studentCount || 0), 0)} Students
+            </p>
           </div>
         </div>
       </div>
@@ -85,6 +87,7 @@ const Classes = () => {
               className={`bg-gradient-to-br ${getCardColor(index)} rounded-xl p-5 text-white cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-xl`}
             >
               <div className="text-3xl font-bold mb-2">{cls.name}</div>
+              <div className="text-sm opacity-90 font-semibold">{cls.studentCount || 0} Students</div>
               <div className="text-sm opacity-80">{cls.sections?.length || 0} Sections</div>
               <div className="mt-3 text-xs opacity-60">
                 {cls.sections?.join(', ') || 'No sections'}

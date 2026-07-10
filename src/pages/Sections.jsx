@@ -73,7 +73,9 @@ const Sections = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold font-amiri">{classData?.name}</h1>
-            <p className="text-sm opacity-80 mt-1">{sections.length} Sections</p>
+            <p className="text-sm opacity-80 mt-1">
+              {sections.length} Sections | {classData?.studentCount || 0} Students
+            </p>
           </div>
           <button
             onClick={() => navigate('/students?add=true')}
@@ -100,6 +102,9 @@ const Sections = () => {
               className={`${sectionColors[index % sectionColors.length]} rounded-xl p-6 text-white cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-xl text-center`}
             >
               <div className="text-4xl font-bold mb-2">{section}</div>
+              <div className="text-sm opacity-90 font-semibold">
+                {classData?.sectionsWithCount?.[section] || 0} Students
+              </div>
               <div className="text-sm opacity-80">Section {section}</div>
               <div className="mt-3 text-xs opacity-60">Click to view students</div>
             </div>

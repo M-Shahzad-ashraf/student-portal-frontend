@@ -65,6 +65,7 @@ const normalizeClass = (doc) => {
     campusId: doc.campusId,
     name: doc.name,
     sections: Array.isArray(doc.sections) ? doc.sections : [],
+    sectionsWithCount: doc.sectionsWithCount || {},
     order: doc.order,
     studentCount: doc.studentCount,
   };
