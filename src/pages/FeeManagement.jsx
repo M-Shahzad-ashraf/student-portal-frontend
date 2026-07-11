@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { feesAPI } from '../api/fees';
+import { classesAPI } from '../api/classes';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import { formatCurrency } from '../utils/helpers';
 import { CAMPUSES, FEE_MONTHS } from '../utils/constants';
@@ -35,21 +36,55 @@ const FeeManagement = () => {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [campusFilter, setCampusFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
+  const [classesList, setClassesList] = useState([]);
   const [minDueMonths, setMinDueMonths] = useState(1);
 
   const yearOptions = [getCurrentYear() - 1, getCurrentYear(), getCurrentYear() + 1];
   const academicStartYear = getAcademicStartYear(selectedMonth, selectedYear);
   const selectedMonths = getMonthsToSelected(selectedMonth);
+  const selectedClass = classesList.find(cls => cls.id === classFilter);
+  const availableSections = selectedClass?.sections || [];
   const visibleDefaulters = defaulters.filter(def => def.dueMonthCount >= minDueMonths);
 
   useEffect(() => {
     fetchData();
-  }, [selectedMonth, selectedYear, campusFilter]);
+  }, [selectedMonth, selectedYear, campusFilter, classFilter, sectionFilter]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [campusFilter]);
+
+  useEffect(() => {
+    setSectionFilter('all');
+  }, [classFilter]);
+
+  const fetchClasses = async () => {
+    try {
+      const response = await classesAPI.getAll(campusFilter !== 'all' ? campusFilter : undefined);
+      const list = campusFilter !== 'all'
+        ? response.data
+        : Object.values(response.data || {}).flat();
+      setClassesList(Array.isArray(list) ? list : []);
+      setClassFilter('all');
+      setSectionFilter('all');
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setClassesList([]);
+      setClassFilter('all');
+      setSectionFilter('all');
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params = campusFilter !== 'all' ? { campusId: campusFilter } : {};
+      const params = {
+        ...(campusFilter !== 'all' ? { campusId: campusFilter } : {}),
+        ...(classFilter !== 'all' ? { classId: classFilter } : {}),
+        ...(sectionFilter !== 'all' ? { section: sectionFilter } : {}),
+      };
       const overviewRes = await feesAPI.getOverview({
         month: selectedMonth,
         year: selectedYear,
@@ -113,6 +148,8 @@ const FeeManagement = () => {
   const handlePrintDefaulters = () => {
     const title = `Outstanding Defaulters - ${selectedMonth} ${selectedYear}`;
     const campusText = campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter);
+    const classText = classFilter === 'all' ? 'All Classes' : selectedClass?.name || classFilter;
+    const sectionText = sectionFilter === 'all' ? 'All Sections' : `Section ${sectionFilter}`;
     const rows = visibleDefaulters.map((def, index) => `
       <tr>
         <td>${index + 1}</td>
@@ -148,7 +185,7 @@ const FeeManagement = () => {
         </head>
         <body>
           <h1>${title}</h1>
-          <div class="meta">${campusText} | ${minDueMonths}+ due month(s) | Total students: ${visibleDefaulters.length}</div>
+          <div class="meta">${campusText} | ${classText} | ${sectionText} | ${minDueMonths}+ due month(s) | Total students: ${visibleDefaulters.length}</div>
           <table>
             <thead>
               <tr>
@@ -185,12 +222,39 @@ const FeeManagement = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={campusFilter}
-            onChange={e => setCampusFilter(e.target.value)}
+            onChange={e => {
+              setCampusFilter(e.target.value);
+              setClassFilter('all');
+              setSectionFilter('all');
+            }}
             className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer"
           >
             <option value="all">All Campuses</option>
             {CAMPUSES.map(campus => (
               <option key={campus.id} value={campus.id}>{campus.label}</option>
+            ))}
+          </select>
+          <select
+            value={classFilter}
+            onChange={e => setClassFilter(e.target.value)}
+            className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer"
+          >
+            <option value="all">All Classes</option>
+            {classesList.map(cls => (
+              <option key={`${cls.campusId}-${cls.id}`} value={cls.id}>
+                {campusFilter === 'all' ? `${getCampusLabel(cls.campusId)} - ` : ''}{cls.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sectionFilter}
+            onChange={e => setSectionFilter(e.target.value)}
+            disabled={classFilter === 'all'}
+            className="py-1.5 px-3 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] outline-none cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="all">All Sections</option>
+            {availableSections.map(section => (
+              <option key={section} value={section}>Section {section}</option>
             ))}
           </select>
           <select
@@ -258,7 +322,13 @@ const FeeManagement = () => {
           <div className="p-4 bg-[#fcf9f2] border-b border-[#c5d8ef] flex items-center justify-between gap-3 flex-wrap">
             <div>
               <span className="font-bold text-gray-800"><i className="ti ti-alert-triangle text-[#ba7517] mr-1"></i> Outstanding Defaulter Register - March to {selectedMonth} {selectedYear}</span>
-              <div className="text-xs text-[#4a5568] mt-1">{campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter)}</div>
+              <div className="text-xs text-[#4a5568] mt-1">
+                {campusFilter === 'all' ? 'All Campuses' : getCampusLabel(campusFilter)}
+                {' | '}
+                {classFilter === 'all' ? 'All Classes' : selectedClass?.name || classFilter}
+                {' | '}
+                {sectionFilter === 'all' ? 'All Sections' : `Section ${sectionFilter}`}
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <select
