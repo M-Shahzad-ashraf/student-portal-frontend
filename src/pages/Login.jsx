@@ -54,8 +54,8 @@ const Login = () => {
 
   const tabs = [
     { id: 'admin', label: 'Admin Login' },
-    { id: 'student', label: 'Student Login' },
-    { id: 'signup', label: 'Student Sign Up' },
+    // { id: 'student', label: 'Student Login' },
+    // { id: 'signup', label: 'Student Sign Up' },
   ];
 
   return (
