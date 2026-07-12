@@ -119,7 +119,7 @@ const Login = () => {
                 </label>
                 <input
                   type="password"
-                  value={adminPass}
+                  // value={adminPass}
                   onChange={(e) => setAdminPass(e.target.value)}
                   className="w-full py-2 px-3.5 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] focus:bg-white outline-none transition-colors duration-200"
                   placeholder="••••••"
@@ -131,9 +131,14 @@ const Login = () => {
               >
                 <IoLogIn size={18} /> Login as Admin
               </button>
-              <p className="text-center text-xs text-[#4a5568] mt-3">
-                Default: admin / admin123
-              </p>
+              <hr />
+              <a href="https://wa.me/923434013800" >
+                <p className="text-center text-xs text-[#0653da] mt-3">
+                  Designed and developed by Shahzad Ashraf.
+
+
+                </p>
+              </a>
             </div>
           )}
 
