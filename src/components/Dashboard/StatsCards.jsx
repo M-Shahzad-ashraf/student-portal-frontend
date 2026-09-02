@@ -10,7 +10,7 @@ const StatsCards = ({ stats }) => {
       color: "bg-[#e6f1fb] text-[#185fa5]"
     },
     {
-      title: "Fee Collection (June)",
+      title: "Fee Collection ",
       value: formatCurrency(stats?.feeCollection || 0),
       icon: "💰",
       color: "bg-[#e1f5ee] text-[#0f6e56]"
