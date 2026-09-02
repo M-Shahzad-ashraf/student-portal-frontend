@@ -24,7 +24,10 @@ const Header = () => {
       <div className="md:ml-auto w-full md:w-auto flex items-center justify-between md:justify-end gap-2.5">
         <div className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1 text-xs flex items-center gap-1.5">
           <IoCalendarOutline size={14} />
-          June 2026
+           {new Date().toLocaleString("en-US", {
+            month: "long",
+            year: "numeric",
+          })}
         </div>
         <div
           className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3.5 py-1 text-xs cursor-pointer hover:bg-white/20 transition-colors"
