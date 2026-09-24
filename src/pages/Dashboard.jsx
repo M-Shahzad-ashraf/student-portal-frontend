@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { dashboardAPI } from '../api/dashboard';
-import StatsCards from '../components/Dashboard/StatsCards';
-import CampusCard from '../components/Dashboard/CampusCard';
-import LoadingSpinner from '../components/Common/LoadingSpinner';
-import { CAMPUSES } from '../utils/constants';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { dashboardAPI } from "../api/dashboard";
+import StatsCards from "../components/Dashboard/StatsCards";
+import CampusCard from "../components/Dashboard/CampusCard";
+import LoadingSpinner from "../components/Common/LoadingSpinner";
+import { CAMPUSES } from "../utils/constants";
+import toast from "react-hot-toast";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,11 +21,15 @@ const Dashboard = () => {
     setLoading(true);
     try {
       const statsRes = await dashboardAPI.getStats();
+      const dashboardData = statsRes.data?.data || statsRes.data;
       setStats(statsRes.data);
-      setCampusStats(statsRes.data.campusStats || {});
+      setCampusStats(dashboardData?.campusStats || {});
     } catch (error) {
-      console.error('Dashboard API Error:', error);
-      toast.error('Failed to load dashboard data');
+      if (error.response?.status === 401) return;
+      console.error("Dashboard API Error:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to load dashboard data",
+      );
     } finally {
       setLoading(false);
     }
@@ -43,9 +47,11 @@ const Dashboard = () => {
       <StatsCards stats={stats} />
 
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="text-lg md:text-xl font-bold text-gray-900">Select Campus</div>
+        <div className="text-lg md:text-xl font-bold text-gray-900">
+          Select Campus
+        </div>
         <button
-          onClick={() => navigate('/students?add=true')}
+          onClick={() => navigate("/students?add=true")}
           className="bg-[#185fa5] text-white hover:bg-[#378add] py-2 px-4 rounded-[10px] text-xs md:text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer"
         >
           <i className="ti ti-plus"></i> Add Student

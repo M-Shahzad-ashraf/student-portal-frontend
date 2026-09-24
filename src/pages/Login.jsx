@@ -119,7 +119,7 @@ const Login = () => {
                 </label>
                 <input
                   type="password"
-                  // value={adminPass}
+                  value={adminPass}
                   onChange={(e) => setAdminPass(e.target.value)}
                   className="w-full py-2 px-3.5 border border-[#c5d8ef] rounded-lg text-sm bg-[#fafcff] focus:border-[#185fa5] focus:bg-white outline-none transition-colors duration-200"
                   placeholder="••••••"

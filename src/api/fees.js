@@ -8,6 +8,9 @@ export const feesAPI = {
   getMonthlyReport: (month, year, params = {}) =>
     api.get("/fees/report/monthly", { params: { month, year, ...params } }),
 
+  // GET /api/fees/report/paid?from=2026-09-17&to=2026-09-23
+  getPaidReport: (params) => api.get("/fees/report/paid", { params }),
+
   // GET /api/fees/student/:studentId/summary
   getStudentSummary: (studentId) =>
     api.get(`/fees/student/${studentId}/summary`),
