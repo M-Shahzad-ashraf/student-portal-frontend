@@ -131,7 +131,7 @@ const FeeManagement = () => {
           : Object.values(response.data || {}).flat();
       const validList = Array.isArray(list) ? list : [];
       setClassesList(validList);
-      
+
       // Default to 1 class if specific campus and classes available
       if (targetCampus !== "all" && validList.length > 0) {
         setClassFilter(validList[0].id);
@@ -332,6 +332,91 @@ const FeeManagement = () => {
     printWindow.print();
   };
 
+  const handlePrintPaidStudents = () => {
+    const title = `Paid Students Report - ${paidRangeLabel}`;
+    const campusText =
+      campusFilter === "all" ? "All Campuses" : getCampusLabel(campusFilter);
+    const classText =
+      classFilter === "all"
+        ? "All Classes"
+        : selectedClass?.name || classFilter;
+    const sectionText =
+      sectionFilter === "all" ? "All Sections" : `Section ${sectionFilter}`;
+    const rows = paidStudents
+      .map(
+        (student, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${student.studentId}</td>
+        <td>${student.studentName || ""}</td>
+        <td>${getCampusLabel(student.campusId)}</td>
+        <td>${student.className || student.classId || "-"} ${student.section ? `(${student.section})` : ""}</td>
+        <td>${student.paidMonths.join(", ")}</td>
+        <td>${new Date(student.latestPaidDate).toLocaleDateString("en-PK")}</td>
+        <td>${student.paymentCount}</td>
+        <td>${student.totalPaid.toLocaleString("en-PK")}</td>
+      </tr>
+    `,
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to print");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { font-size: 12px; color: #4b5563; margin-bottom: 16px; }
+            .summary { display: flex; gap: 20px; margin-bottom: 16px; font-size: 12px; }
+            .summary div { background: #f0f8f5; padding: 8px 12px; border-radius: 6px; border: 1px solid #c5d8ef; }
+            .summary strong { color: #0f6e56; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #d1d5db; padding: 6px; text-align: left; vertical-align: top; }
+            th { background: #e1f5ee; }
+            td:last-child, th:last-child { text-align: right; }
+            td:nth-child(7), th:nth-child(7),
+            td:nth-child(8), th:nth-child(8) { text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <div class="meta">${campusText} | ${classText} | ${sectionText}</div>
+          <div class="summary">
+            <div>Total Students: <strong>${paidSummary.totalStudents}</strong></div>
+            <div>Total Payments: <strong>${paidSummary.totalPayments}</strong></div>
+            <div>Total Collected: <strong>PKR ${paidSummary.totalPaid.toLocaleString("en-PK")}</strong></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Campus</th>
+                <th>Class</th>
+                <th>Paid Months</th>
+                <th>Latest Paid Date</th>
+                <th>Payments</th>
+                <th>Total Paid</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="9">No paid students found</td></tr>'}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const ovData = overview?.data || overview;
 
   return (
@@ -422,7 +507,9 @@ const FeeManagement = () => {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}
+      >
         <div className="bg-white rounded-lg border border-[#c5d8ef] p-3.5 flex items-center gap-3 shadow-sm">
           <div className="w-10 h-10 rounded-[9px] flex items-center justify-center text-lg shrink-0 bg-[#e1f5ee] text-[#0f6e56]">
             <i className="ti ti-check-circle"></i>
@@ -508,12 +595,14 @@ const FeeManagement = () => {
                 {campusFilter === "all"
                   ? "All Campuses"
                   : getCampusLabel(campusFilter)}{" "}
-                {classFilter !== "all" && selectedClass ? `- ${selectedClass.name} ` : ""}
+                {classFilter !== "all" && selectedClass
+                  ? `- ${selectedClass.name} `
+                  : ""}
                 summary for {selectedMonth} {selectedYear}
               </div>
               <div className="text-xs text-[#4a5568] mt-1">
-                Expected: {formatCurrency(ovData?.expectedTotal || 0)} | Collection
-                Rate: {ovData?.collectionRate || 0}%
+                Expected: {formatCurrency(ovData?.expectedTotal || 0)} |
+                Collection Rate: {ovData?.collectionRate || 0}%
               </div>
             </>
           )}
@@ -580,7 +669,9 @@ const FeeManagement = () => {
                     <td colSpan="5" className="text-center py-16 text-gray-500">
                       <div className="flex flex-col items-center justify-center gap-2.5">
                         <div className="w-7 h-7 border-2 border-[#ba7517] border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs font-medium text-gray-600">Loading defaulters list...</span>
+                        <span className="text-xs font-medium text-gray-600">
+                          Loading defaulters list...
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -642,21 +733,31 @@ const FeeManagement = () => {
                 {formatCurrency(paidSummary.totalPaid)}
               </div>
             </div>
-            <div className="flex items-center gap-1 p-1 bg-white border border-[#c5d8ef] rounded-lg">
-              {["today", "week", "month"].map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => setPaidRange(range)}
-                  className={`py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer ${paidRange === range ? "bg-[#0f6e56] text-white" : "text-[#0f6e56] hover:bg-[#e1f5ee]"}`}
-                >
-                  {range === "today"
-                    ? "Today"
-                    : range === "week"
-                      ? "7 Days"
-                      : "Month"}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 p-1 bg-white border border-[#c5d8ef] rounded-lg">
+                {["today", "week", "month"].map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setPaidRange(range)}
+                    className={`py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer ${paidRange === range ? "bg-[#0f6e56] text-white" : "text-[#0f6e56] hover:bg-[#e1f5ee]"}`}
+                  >
+                    {range === "today"
+                      ? "Today"
+                      : range === "week"
+                        ? "7 Days"
+                        : "Month"}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handlePrintPaidStudents}
+                disabled={paidLoading || paidStudents.length === 0}
+                className="py-1.5 px-3 rounded-lg text-xs md:text-sm font-semibold bg-[#0f6e56] text-white hover:bg-[#1a8a6e] inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="ti ti-printer"></i> Print
+              </button>
             </div>
           </div>
           <div className="w-full overflow-x-auto">
@@ -677,7 +778,9 @@ const FeeManagement = () => {
                     <td colSpan="6" className="text-center py-16 text-gray-500">
                       <div className="flex flex-col items-center justify-center gap-2.5">
                         <div className="w-7 h-7 border-2 border-[#0f6e56] border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs font-medium text-gray-600">Loading paid students...</span>
+                        <span className="text-xs font-medium text-gray-600">
+                          Loading paid students...
+                        </span>
                       </div>
                     </td>
                   </tr>
