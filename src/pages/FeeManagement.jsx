@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { feesAPI } from "../api/fees";
 import { classesAPI } from "../api/classes";
-import LoadingSpinner from "../components/Common/LoadingSpinner";
 import { formatCurrency } from "../utils/helpers";
 import { CAMPUSES, FEE_MONTHS } from "../utils/constants";
 import toast from "react-hot-toast";
@@ -83,7 +82,12 @@ const FeeManagement = () => {
   const [classesList, setClassesList] = useState([]);
   const [classesLoading, setClassesLoading] = useState(false);
   const [minDueMonths, setMinDueMonths] = useState(1);
+
   const [paidRange, setPaidRange] = useState("today");
+  // ✅ Custom date range states
+  const [customFromDate, setCustomFromDate] = useState("");
+  const [customToDate, setCustomToDate] = useState("");
+
   const [paidStudents, setPaidStudents] = useState([]);
   const [paidSummary, setPaidSummary] = useState({
     totalStudents: 0,
@@ -114,10 +118,19 @@ const FeeManagement = () => {
     fetchData();
   }, [selectedMonth, selectedYear, campusFilter, classFilter, sectionFilter]);
 
+  // ✅ Paid students fetch — custom range ke liye bhi trigger kare
   useEffect(() => {
     if (!classFilter) return;
+    if (paidRange === "custom" && (!customFromDate || !customToDate)) return;
     fetchPaidStudents();
-  }, [paidRange, campusFilter, classFilter, sectionFilter]);
+  }, [
+    paidRange,
+    customFromDate,
+    customToDate,
+    campusFilter,
+    classFilter,
+    sectionFilter,
+  ]);
 
   const fetchClasses = async (targetCampus = campusFilter) => {
     setClassesLoading(true);
@@ -132,7 +145,6 @@ const FeeManagement = () => {
       const validList = Array.isArray(list) ? list : [];
       setClassesList(validList);
 
-      // Default to 1 class if specific campus and classes available
       if (targetCampus !== "all" && validList.length > 0) {
         setClassFilter(validList[0].id);
       } else {
@@ -224,7 +236,12 @@ const FeeManagement = () => {
   async function fetchPaidStudents() {
     setPaidLoading(true);
     try {
-      const dateRange = getPaidDateRange(paidRange);
+      // ✅ Custom range ho to custom dates bhejo, warna predefined range
+      const dateRange =
+        paidRange === "custom"
+          ? { from: customFromDate, to: customToDate }
+          : getPaidDateRange(paidRange);
+
       const params = {
         ...dateRange,
         ...(campusFilter !== "all" ? { campusId: campusFilter } : {}),
@@ -252,12 +269,17 @@ const FeeManagement = () => {
     }
   }
 
+  // ✅ Dynamic label
   const paidRangeLabel =
     paidRange === "today"
       ? "Today"
       : paidRange === "week"
         ? "Last 7 Days"
-        : "This Month";
+        : paidRange === "month"
+          ? "This Month"
+          : customFromDate && customToDate
+            ? `${new Date(customFromDate).toLocaleDateString("en-PK")} - ${new Date(customToDate).toLocaleDateString("en-PK")}`
+            : "Custom Range";
 
   const handlePrintDefaulters = () => {
     const title = `Outstanding Defaulters - ${selectedMonth} ${selectedYear}`;
@@ -421,6 +443,7 @@ const FeeManagement = () => {
 
   return (
     <div>
+      {/* ── Top Header ─────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <div className="text-lg md:text-xl font-bold text-gray-900">
@@ -507,6 +530,7 @@ const FeeManagement = () => {
         </div>
       </div>
 
+      {/* ── Stats Cards ─────────────────────────────── */}
       <div
         className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}
       >
@@ -556,6 +580,7 @@ const FeeManagement = () => {
         </div>
       </div>
 
+      {/* ── Tabs ────────────────────────────────────── */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <button
           onClick={() => setActiveTab("overview")}
@@ -582,6 +607,7 @@ const FeeManagement = () => {
         </button>
       </div>
 
+      {/* ── Overview Tab ────────────────────────────── */}
       {activeTab === "overview" && (
         <div className="bg-white rounded-[10px] border border-[#c5d8ef] p-4 shadow-sm">
           {loading ? (
@@ -609,6 +635,7 @@ const FeeManagement = () => {
         </div>
       )}
 
+      {/* ── Defaulters Tab ──────────────────────────── */}
       {activeTab === "defaulters" && (
         <div className="bg-white rounded-[10px] border border-[#c5d8ef] overflow-hidden shadow-sm">
           <div className="p-4 bg-[#fcf9f2] border-b border-[#c5d8ef] flex items-center justify-between gap-3 flex-wrap">
@@ -719,6 +746,7 @@ const FeeManagement = () => {
         </div>
       )}
 
+      {/* ── Paid Students Tab ───────────────────────── */}
       {activeTab === "paid" && (
         <div className="bg-white rounded-[10px] border border-[#c5d8ef] overflow-hidden shadow-sm">
           <div className="p-4 bg-[#f0f8f5] border-b border-[#c5d8ef] flex items-center justify-between gap-3 flex-wrap">
@@ -733,23 +761,54 @@ const FeeManagement = () => {
                 {formatCurrency(paidSummary.totalPaid)}
               </div>
             </div>
+
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Range buttons + Custom */}
               <div className="flex items-center gap-1 p-1 bg-white border border-[#c5d8ef] rounded-lg">
-                {["today", "week", "month"].map((range) => (
+                {["today", "week", "month", "custom"].map((range) => (
                   <button
                     key={range}
                     type="button"
                     onClick={() => setPaidRange(range)}
-                    className={`py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer ${paidRange === range ? "bg-[#0f6e56] text-white" : "text-[#0f6e56] hover:bg-[#e1f5ee]"}`}
+                    className={`py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer ${
+                      paidRange === range
+                        ? "bg-[#0f6e56] text-white"
+                        : "text-[#0f6e56] hover:bg-[#e1f5ee]"
+                    }`}
                   >
                     {range === "today"
                       ? "Today"
                       : range === "week"
                         ? "7 Days"
-                        : "Month"}
+                        : range === "month"
+                          ? "Month"
+                          : "Custom"}
                   </button>
                 ))}
               </div>
+
+              {/* ✅ Custom date inputs */}
+              {paidRange === "custom" && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="date"
+                    value={customFromDate}
+                    max={customToDate || toDateInputValue(new Date())}
+                    onChange={(e) => setCustomFromDate(e.target.value)}
+                    className="py-1.5 px-2.5 border border-[#c5d8ef] rounded-lg text-xs bg-white focus:border-[#0f6e56] outline-none"
+                  />
+                  <span className="text-xs text-[#4a5568]">to</span>
+                  <input
+                    type="date"
+                    value={customToDate}
+                    min={customFromDate}
+                    max={toDateInputValue(new Date())}
+                    onChange={(e) => setCustomToDate(e.target.value)}
+                    className="py-1.5 px-2.5 border border-[#c5d8ef] rounded-lg text-xs bg-white focus:border-[#0f6e56] outline-none"
+                  />
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handlePrintPaidStudents}
@@ -760,6 +819,7 @@ const FeeManagement = () => {
               </button>
             </div>
           </div>
+
           <div className="w-full overflow-x-auto">
             <table className="w-full border-collapse text-xs md:text-sm min-w-[850px]">
               <thead className="bg-[#f0f5fb] text-[#4a5568] text-[11px] font-bold uppercase tracking-wider text-left border-b border-[#c5d8ef]">
